@@ -1,0 +1,35 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+# semiautoReg
+
+<!-- badges: start -->
+
+<!-- badges: end -->
+
+The goal of `semiautoReg` is to provide a simple workflow for
+semiparametric regression with autocorrelated errors.
+
+This package combines spline-based flexible regression and
+autocorrelation correction in one R package structure. It is developed
+as part of the Statistical Programming course.
+
+## Installation
+
+This package is currently under development.
+
+After the package is uploaded to GitHub, it can be installed using:
+
+``` r
+# install.packages("remotes")
+remotes::install_github("your-username/semiautoReg")
+```
+
+## Example
+
+The main functions of this package will be added in the next development
+stage.
+
+``` r
+library(semiautoReg)
+```

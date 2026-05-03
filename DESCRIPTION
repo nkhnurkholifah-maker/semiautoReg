@@ -1,0 +1,15 @@
+Package: semiautoReg
+Title: Semiparametric Regression with Autocorrelated Errors
+Version: 0.0.0.9000
+Authors@R: 
+    person("Nur", "Kholifah",email= "nurkholifah11@gmail.com", role = c("aut", "cre"))
+Description: Provides tools for semiparametric regression modeling with autocorrelated errors.
+    The package combines spline-based flexible regression and autocorrelation correction
+    in a simple R package workflow.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
