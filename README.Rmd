@@ -30,7 +30,7 @@ After the package is uploaded to GitHub, it can be installed using:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("your-username/semiautoReg")
+remotes::install_github("nkhnurkholifah-maker/semiautoReg")
 ```
 
 ## Example
