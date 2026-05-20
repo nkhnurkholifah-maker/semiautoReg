@@ -15,19 +15,19 @@ semiauto_fit(
 )
 }
 \arguments{
-\item{prepared}{An object returned by semiauto_prepare().}
+\item{prepared}{An object returned by \code{semiauto_prepare()}. This argument is required.}
 
-\item{spline_var}{Character. Variable modeled nonparametrically.}
+\item{spline_var}{Character. Name of the predictor to be modeled nonparametrically using spline basis. This argument is required.}
 
-\item{df}{Degrees of freedom for B-spline basis.}
+\item{df}{Numeric. Degrees of freedom for the spline basis. Default is 5.}
 
-\item{degree}{Degree of spline basis.}
+\item{degree}{Numeric. Degree of the spline basis. Default is 3.}
 
-\item{lambda}{SCAD penalty parameter.}
+\item{lambda}{Numeric. SCAD penalty parameter. Default is 0.1.}
 
-\item{max_iter}{Maximum number of iterations.}
+\item{max_iter}{Numeric. Maximum number of iterations. Default is 50.}
 
-\item{tol}{Convergence tolerance.}
+\item{tol}{Numeric. Convergence tolerance. Default is 1e-6.}
 }
 \value{
 A list containing fitted model results.
@@ -36,4 +36,19 @@ A list containing fitted model results.
 Fits a semiparametric regression model using
 B-spline basis expansion, SCAD penalty,
 and autoregressive error correction.
+}
+\examples{
+prep <- semiauto_prepare(
+  data = mtcars,
+  y = "mpg",
+  x = c("wt", "hp", "qsec")
+)
+
+fit <- semiauto_fit(
+  prepared = prep,
+  spline_var = "wt"
+)
+
+fit
+
 }

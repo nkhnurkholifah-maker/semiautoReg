@@ -31,18 +31,32 @@ scad_lqa_weight=function(t,lambda,a=3.7,eps=1e-6){
 #' B-spline basis expansion, SCAD penalty,
 #' and autoregressive error correction.
 #'
-#' @param prepared An object returned by semiauto_prepare().
-#' @param spline_var Character. Variable modeled nonparametrically.
-#' @param df Degrees of freedom for B-spline basis.
-#' @param degree Degree of spline basis.
-#' @param lambda SCAD penalty parameter.
-#' @param max_iter Maximum number of iterations.
-#' @param tol Convergence tolerance.
+#' @param prepared An object returned by \code{semiauto_prepare()}. This argument is required.
+#' @param spline_var Character. Name of the predictor to be modeled nonparametrically using spline basis. This argument is required.
+#' @param df Numeric. Degrees of freedom for the spline basis. Default is 5.
+#' @param degree Numeric. Degree of the spline basis. Default is 3.
+#' @param lambda Numeric. SCAD penalty parameter. Default is 0.1.
+#' @param max_iter Numeric. Maximum number of iterations. Default is 50.
+#' @param tol Numeric. Convergence tolerance. Default is 1e-6.
 #'
 #' @return A list containing fitted model results.
 #'
 #' @importFrom splines bs
 #' @importFrom MASS ginv
+#'
+#' @examples
+#' prep <- semiauto_prepare(
+#'   data = mtcars,
+#'   y = "mpg",
+#'   x = c("wt", "hp", "qsec")
+#' )
+#'
+#' fit <- semiauto_fit(
+#'   prepared = prep,
+#'   spline_var = "wt"
+#' )
+#'
+#' fit
 #'
 #' @export
 
