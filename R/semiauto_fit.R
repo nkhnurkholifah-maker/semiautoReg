@@ -154,7 +154,10 @@ fit_fixed=function(Y,X,Z_list,q,lambda,mu,max_iter=100,tol=1e-6,a=3.7){
     res=bcd_step(Ystar,Zstar,theta,gamma,
                  lambda,mu,n_groups=length(Z_list),
                  Kbar=Kbar,n,q,a)
-    diff=max(abs(res$theta-theta),abs(res$gamma-gamma))
+    old_par <- c(theta, gamma)
+    new_par <- c(res$theta, res$gamma)
+
+    diff <- max(abs(new_par - old_par))/(1 + max(abs(old_par)))
     theta=res$theta
     gamma=res$gamma
     iter_count=iter
