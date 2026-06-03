@@ -2,15 +2,15 @@
 % Please edit documentation in R/semiauto_fit.R
 \name{print.semiauto_fit}
 \alias{print.semiauto_fit}
-\title{Print semiauto_fit Object}
+\title{Print method for semiauto_fit}
 \usage{
 \method{print}{semiauto_fit}(x, ...)
 }
 \arguments{
-\item{x}{Object from semiauto_fit().}
+\item{x}{A \code{semiauto_fit} object.}
 
-\item{...}{Additional arguments.}
+\item{...}{Ignored.}
 }
 \description{
-Print semiauto_fit Object
+Print method for semiauto_fit
 }

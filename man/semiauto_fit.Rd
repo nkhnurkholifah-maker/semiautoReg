@@ -2,53 +2,112 @@
 % Please edit documentation in R/semiauto_fit.R
 \name{semiauto_fit}
 \alias{semiauto_fit}
-\title{Fit Semiparametric Regression with AR Errors}
+\title{Fit Semiparametric Partially Linear Model with Autoregressive Errors}
 \usage{
 semiauto_fit(
   prepared,
-  spline_var,
-  df = 5,
-  degree = 3,
-  lambda = 0.1,
-  max_iter = 50,
-  tol = 1e-06
+  q = NULL,
+  q_max = 5L,
+  lambda = NULL,
+  mu = NULL,
+  lambda_grid = NULL,
+  mu_grid = NULL,
+  tuning_method = c("BIC", "AIC", "CV"),
+  nfolds = 5L,
+  df = 6L,
+  degree = 3L,
+  a = 3.7,
+  max_iter = 100L,
+  tol = 1e-06,
+  verbose = TRUE
 )
 }
 \arguments{
-\item{prepared}{An object returned by \code{semiauto_prepare()}. This argument is required.}
+\item{prepared}{An object returned by  \code{semiauto_prepare()}. Required.}
 
-\item{spline_var}{Character. Name of the predictor to be modeled nonparametrically using spline basis. This argument is required.}
+\item{q}{Integer.AR order. If \code{NULL} (default), selected automatically
+via BIC on initial residuals up to \code{q_max}.}
 
-\item{df}{Numeric. Degrees of freedom for the spline basis. Default is 5.}
+\item{q_max}{Integer. Maximum AR order considered during auto-selection.
+Default is \code{5}}
 
-\item{degree}{Numeric. Degree of the spline basis. Default is 3.}
+\item{lambda}{Numeric. SCAD penalty for spline(nonlinear) coefficients.
+If \code{NULL} (default), selected via \code{tuning_method}.}
 
-\item{lambda}{Numeric. SCAD penalty parameter. Default is 0.1.}
+\item{mu}{Numeric. SCAD penalty for AR coefficients. If \code{NULL}
+(default), selected via \code{tuning_method}.}
 
-\item{max_iter}{Numeric. Maximum number of iterations. Default is 50.}
+\item{lambda_grid}{Numeric vector. Grid for \code{lambda} search. Default
+is \code{exp(seq(log(0.05),log(3),length.out=20))}.}
 
-\item{tol}{Numeric. Convergence tolerance. Default is 1e-6.}
+\item{mu_grid}{Numeric vector. Grid for \code{mu} search. Default is \code{exp(seq(log(0.1),log(1),length.out=15))}.}
+
+\item{tuning_method}{Character. Method for selecting tuning parameters
+\code{lambda} and \code{mu}.One of:
+\itemize{
+\item \code{"BIC"}-Bayesian Information Criterion(default, fast, recommended for most cases)
+\item \code{"AIC"}-Akaike Information Criterion (slightly less sparse than BIC, also fast)
+\item \code{"CV"}-5-fold cross - validation (more accurate but significantly slower;only recommended when BIC/AIC results look
+unstable or for small grids)
+}}
+
+\item{nfolds}{Integer. Number of CV folds. Default is \code{5}.}
+
+\item{df}{Integer. Degrees of freedom for each B-spline basis(per predictor).
+Default is \code{6} (cubic spline with 3 internal knots).}
+
+\item{degree}{Integer. Degree of B-spline polynomial. Default is \code{3} (cubic).}
+
+\item{a}{Numeric. SCAD shape parameter. Default is \code{3.7} (Fan & Li 2001).}
+
+\item{max_iter}{Integer. Maximum LQA iterations. Default is \code{100}.}
+
+\item{tol}{Numeric. Convergence tolerance. Default is \code{1e-6}.}
+
+\item{verbose}{Logical. Print progress. Default is \code{TRUE}.}
 }
 \value{
-A list containing fitted model results.
+An object of class \code{"semiauto_fit"} containing:
+\describe{
+\item{beta}{Estimated linear coefficients (named vector).}
+\item{theta}{Estimated spline coefficients (named vector).}
+\item{gamma}{Estimated AR coefficients (named vector, zeros omitted).}
+\item{q_selected}{AR order used.}
+\item{lambda}{Tuning parameter used for spline penalty.}
+\item{mu}{Tuning parameter used for AR penalty.}
+\item{linear_vars}{Character vector of predictors identified as linear.}
+\item{nonlinear_vars}{Character vector of predictors identified as nonlinear.}
+\item{active_lags}{Integer vector of significant AR lags.}
+\item{fitted_values}{Fitted values (length n).}
+\item{residuals}{Residuals (length n).}
+\item{converged}{Logical. Did LQA converge?}
+\item{iterations}{Number of LQA iterations used.}
+\item{tuning_method}{Tuning method used.}
+\item{call}{The matched call.}
+}
 }
 \description{
-Fits a semiparametric regression model using
-B-spline basis expansion, SCAD penalty,
-and autoregressive error correction.
+Implements the penalised identification procedure of Kazemi et al. (2021)
+for partially linear regression models with AR(q) errors. Simultaneously
+identifies linear and nonlinear predictors and selects the AR order using
+SCAD penalisation via Local Quadratic Approximation (LQA).
 }
 \examples{
+\dontrun{
 prep <- semiauto_prepare(
-  data = mtcars,
-  y = "mpg",
-  x = c("wt", "hp", "qsec")
+data = my_data,
+y    = "response",
+x    = c("x1","x2","x3","x4"),
+time = "quarter"
 )
 
-fit <- semiauto_fit(
-  prepared = prep,
-  spline_var = "wt"
-)
+fit <- semiauto_fit(prep)
+print(fit)
+summary(fit)
+}
 
-fit
-
+}
+\references{
+Kazemi, M., Shahsvani, D., Arashi, M., & Rodrigues,P.C. (2021).
+Identification for Partially Linear Model with Autoregressive Errors
 }
