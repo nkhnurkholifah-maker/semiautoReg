@@ -94,14 +94,24 @@ SCAD penalisation via Local Quadratic Approximation (LQA).
 }
 \examples{
 \dontrun{
-prep <- semiauto_prepare(
-data = my_data,
-y    = "response",
-x    = c("x1","x2","x3","x4"),
-time = "quarter"
+#Load example dataset
+data(macro_turkey)
+
+#Prepare data
+prep=semiauto_prepare(
+data=macro_turkey,
+  y="inflasi",
+  x=c("kurs","m3","industri","kredit","brent"),
+  time="Tarih"
 )
 
-fit <- semiauto_fit(prep)
+#Fit model
+fit <- semiauto_fit(
+  prepared=prep,
+  max_iter=1000,
+  verbose=FALSE
+)
+
 print(fit)
 summary(fit)
 }

@@ -307,14 +307,24 @@ select_q=function(e,q_max){
 #'
 #' @examples
 #' \dontrun{
-#' prep <- semiauto_prepare(
-#' data = my_data,
-#' y    = "response",
-#' x    = c("x1","x2","x3","x4"),
-#' time = "quarter"
+#' #Load example dataset
+#' data(macro_turkey)
+#'
+#' #Prepare data
+#' prep=semiauto_prepare(
+#' data=macro_turkey,
+#'   y="inflasi",
+#'   x=c("kurs","m3","industri","kredit","brent"),
+#'   time="Tarih"
 #' )
 #'
-#' fit <- semiauto_fit(prep)
+#' #Fit model
+#' fit <- semiauto_fit(
+#'   prepared=prep,
+#'   max_iter=1000,
+#'   verbose=FALSE
+#' )
+#'
 #' print(fit)
 #' summary(fit)
 #' }
@@ -531,8 +541,28 @@ print.semiauto_fit=function(x, ...){
   }else{
     cat("No significant AR lags detected.\n\n")
   }
-  cat("Linear coefficients (beta):\n")
-  print(round(x$beta,4))
+  cat("Parametric Linear part:\n")
+  keep=c("(Intercept)",x$linear_vars)
+  beta_lin=x$beta[names(x$beta) %in% keep]
+  if(length(beta_lin)>0){
+    print(round(beta_lin,4))
+  }else{
+    cat("(none)\n")
+  }
+  cat("\nNonlinear functions:\n")
+  if(length(x$nonlinear_vars)>0){
+    for(vname in x$nonlinear_vars){
+      beta_j=x$beta[vname]
+      cat("f_",vname,"(x) = ",
+          round(beta_j,4),
+          "*x + g_", vname,"(x)\n",
+          sep="")
+    }
+    cat("\nNote: For nonlinear variables, beta is part of total function f_j(x).\n")
+  }else{
+    cat("(none)\n\n")
+  }
+
   invisible(x)
 }
 #' Summary Method for semiauto_fit
@@ -564,8 +594,31 @@ summary.semiauto_fit=function(object,...){
     "(none)","\n")
   cat("Nonlinear      :",if(length(x$nonlinear_vars)>0)paste(x$nonlinear_vars,collapse = ",")else
     "(none)","\n")
-  cat("\nLinear coefficients (beta):\n")
-  print(round(x$beta,6))
+  #Linear Coefficients: only intercept+variable S1
+  cat("\nLinear coefficients hat (S1):\n")
+  keep=c("(Intercept)",x$linear_vars)
+  beta_lin=x$beta[names(x$beta) %in% keep]
+  print(round(beta_lin,6))
+  #Nonlinear Components : Show the beta_h (tren linear) and norm spline
+  #f_j(x)=beta_j*x + g_j(x) - full effect by spline curve
+  if(length(x$nonlinear_vars)>0){
+    cat("\n Nonlinear components hat(S2)\n")
+    cat("f_j(x)=beta_j*x + g_j(x)\n")
+    cat("beta_j=linear trend| ||theta_j||\n\n")
+    Kbar=ncol(x$Z_list[[1]])
+    cat(sprintf("%-10s  %-20s %s\n",
+                "Variable","beta_j(linear trend)","||theta_j|| (nonlinear)"
+                ))
+    cat("",strrep("-",48),"\n")
+    for(vname in x$nonlinear_vars){
+      j=which(x$x==vname)
+      cols_j=((j-1)*Kbar+1):(j*Kbar)
+      norm_j=round(sqrt(sum(x$theta[cols_j]^2)),4)
+      beta_j=round(x$beta[vname],4)
+      cat(sprintf("%-10s  %-20.4f   %.4f\n",vname,beta_j,norm_j))
+    }
+  }
+
   cat("\n AR coefficients (gamma):\n")
   if(length(x$active_lags)>0){
     print(round(x$gamma[x$active_lags],6))
@@ -633,7 +686,3 @@ predict.semiauto_fit=function(object,newdata=NULL,...){
   Z_new=do.call(cbind,Z_new_list)
   as.vector(X_new%*%object$beta+Z_new%*%object$theta)
 }
-
-
-
-
