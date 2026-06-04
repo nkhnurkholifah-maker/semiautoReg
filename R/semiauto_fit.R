@@ -356,6 +356,46 @@ semiauto_fit=function(prepared,
   x_names=prepared$predictors
   n=nrow(model_data)
   p=length(x_names)
+
+  #Check high correlation among numeric predictors
+  num_x=x_names[sapply(model_data[x_names],is.numeric)]
+  if(length(num_x)>=2){
+    cor_mat=stats::cor(
+      model_data[num_x],
+      use="pairwise.complete.obs"
+    )
+    cor_mat[lower.tri(cor_mat,diag=TRUE)]=NA
+    max_cor=max(abs(cor_mat),na.rm=TRUE)
+    if(is.finite(max_cor) && max_cor >=0.8){
+      loc=which(abs(cor_mat)==max_cor,arr.ind=TRUE)[1,]
+      var1=rownames(cor_mat)[loc[1]]
+      var2=colnames(cor_mat)[loc[2]]
+      warning(
+        paste0(
+          "High correlation detected between predictors '",
+          var1,"' and '", var2,
+          "' (|cor| =", round(max_cor, 3), "). ",
+          "Structure identification may be unstable."
+        ),
+        call. =FALSE
+      )
+    }
+  }
+
+  #Check predictors with few unique values
+  unique_counts=sapply(model_data[x_names],function(z) length(unique(z)))
+  low_unique=names(unique_counts)[unique_counts<df]
+  if(length(low_unique)>0){
+    warning(
+      paste0(
+        "Some predictors have few unique values: ",
+        paste0(low_unique," (", unique_counts[low_unique], " unique)", collapse = ","),
+        ". B-spline estimation may be unstable.",
+        "Consider treating them as linear or categorical variables."
+      ),
+      call. = FALSE
+    )
+  }
   if(p<1) stop("At least one predictor is required.")
   if(n<2*p*df)
     warning("Sample size may be too small relative to number of basis functions.")
