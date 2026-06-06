@@ -1,0 +1,481 @@
+---
+title: "semiautoReg: Structure Identification in Partially Linear Models with Autoregressive Errors"
+author: "Nur Kholifah"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteEncoding{UTF-8}
+  %\VignetteIndexEntry{semiautoReg: Structure Identification in Partially Linear Models with Autoregressive Errors}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: 72
+
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  fig.align  = "center"
+)
+```
+
+------------------------------------------------------------------------
+
+# Introduction
+
+semiautoReg provides tools for structure identification in partially
+linear regression models with autoregressive errors (PLM-AR).
+
+The package can:
+
+-   identify linear and nonlinear predictors,
+-   select the AR order automatically,
+-   estimate model parameters using Group SCAD penalization, and
+-   produce diagnostic plots for model assessment.
+
+This vignette demonstrates a complete workflow using the built-in
+macro_turkey dataset.
+
+## The Model
+
+The full additive model is
+
+$$
+y_t = \sum_{j=1}^{p} f_j(x_{tj}) + \varepsilon_t, \quad t = 1, \ldots, n,
+$$ Each component function is decomposed into a linear part and a
+nonlinear deviation:
+
+$$
+f_j(x) = \beta_j x + g_j(x).
+$$
+
+The nonlinear deviation is approximated using centered B-spline basis
+functions:
+
+$$
+g_j(x) \approx \sum_{k=1}^{K} \theta_{jk} B_{jk}(x)
+= \mathbf{B}_j(x)^\top \boldsymbol{\theta}_j.
+$$
+
+Here, $\mathbf{B}_j(x)$ is the vector of centered B-spline basis
+functions for predictor $j$, and $\boldsymbol{\theta}_j$ is the
+corresponding spline coefficient vector. Therefore, the full component
+can be written as
+
+$$
+f_j(x) \approx \beta_j x + \mathbf{B}_j(x)^\top \boldsymbol{\theta}_j.
+$$ The error follows an AR($q$) process:
+
+$$
+\varepsilon_t = \sum_{l=1}^{q} \gamma_l \varepsilon_{t-l} + e_t,
+\quad e_t \overset{\text{iid}}{\sim} (0, \sigma^2).
+$$
+
+A variable is identified as linear when
+$\|\hat{\boldsymbol{\theta}}_j\| = 0$, because the nonlinear deviation
+is removed. It is identified as nonlinear when
+$\|\hat{\boldsymbol{\theta}}_j\| > 0$. Similarly, AR lag $l$ is retained
+when $|\hat{\gamma}_l| > 0$ and removed when it is shrunk to zero.
+
+## Penalized Objective
+
+Structure identification is achieved by minimizing
+
+$$
+Q(\boldsymbol{\theta}, \boldsymbol{\gamma})
+=
+L(\boldsymbol{\theta}, \boldsymbol{\gamma})
++
+\lambda \sum_{j=1}^{p}
+p_{\text{SCAD}}
+\left(
+\|\boldsymbol{\theta}_j\|
+\right)
++
+\mu \sum_{l=1}^{q}
+p_{\text{SCAD}}
+\left(
+|\gamma_l|
+\right).
+$$
+
+where $L(\boldsymbol{\theta}, \boldsymbol{\gamma})$ denotes the
+AR-corrected least-squares loss and $p_{\text{SCAD}}$ is the Smoothly
+Clipped Absolute Deviation penalty of Fan and Li (2001) with shape
+parameter $a = 3.7$. Minimization uses the Block Coordinate Descent
+(BCD) algorithm with LQA updates at each step (Algorithm 1 in Kazemi et
+al. (2021)).
+
+------------------------------------------------------------------------
+
+# Installation
+
+The package can be installed from CRAN (once released):
+
+```{r install-cran, eval = FALSE}
+install.packages("semiautoReg")
+```
+
+The development version can be installed from GitHub:
+
+```{r install-github, eval = FALSE}
+# install.packages("remotes")
+remotes::install_github( "nkhnurkholifah-maker/semiautoReg")
+```
+
+The source code is available at:
+
+<https://github.com/nkhnurkholifah-maker/semiautoReg>
+
+Load the package:
+
+```{r load}
+library(semiautoReg)
+```
+
+------------------------------------------------------------------------
+
+# A Complete Worked Example
+
+## Data: Turkish Macroeconomic Indicators
+
+The package includes `macro_turkey`, a monthly dataset with 133
+observations of Turkish macroeconomic indicators from January 2015 to
+January 2026.
+
+```{r data-preview, echo=FALSE}
+data(macro_turkey)
+
+knitr::kable(
+  head(macro_turkey),
+  caption = "First six observations of macro_turkey"
+)
+```
+
+The variables are:
+
+| Variable   | Description                        |
+|------------|------------------------------------|
+| `Tarih`    | Observation date                   |
+| `inflasi`  | Monthly inflation rate (response)  |
+| `kurs`     | USD/TRY exchange rate              |
+| `m3`       | Broad money supply (M3)            |
+| `industri` | Industrial production index        |
+| `kredit`   | Total credit volume                |
+| `brent`    | Brent crude oil price (USD/barrel) |
+
+Inflation is modelled as a function of the five macroeconomic
+covariates. Because the data are time-ordered, the error terms may
+exhibit serial correlation — precisely the setting that `semiautoReg` is
+designed for.
+
+## Step 1 — Data Preparation with `semiauto_prepare()`
+
+`semiauto_prepare()` validates the input, handles missing values, sorts
+observations by the time variable, and constructs the model matrices
+passed internally to the fitting routine.
+
+```{r prepare}
+prep <- semiauto_prepare(
+  data    = macro_turkey,
+  y       = "inflasi",
+  x       = c("kurs", "m3", "industri", "kredit", "brent"),
+  time    = "Tarih"
+)
+```
+
+The function prints a short summary. The returned `semiauto_prepare`
+object stores the cleaned response vector (`prep$y`), the design matrix
+with intercept (`prep$X`), and the aligned `model_data` data frame.
+
+## Step 2 — Model Fitting with `semiauto_fit()`
+
+Pass the prepared object to `semiauto_fit()`. By default the function
+
+1.  selects AR order (q) automatically from 1 to `q_max = 5` using
+    residuals,
+2.  searches a 20 × 15 grid of $(\lambda, \mu)$ values using the selected tuning criterion (`"BIC"` by default), 
+3. uses cubic B-splines with `df = 6` and `degree = 3`, and
+4.  runs the Local Quadratic Approximation (LQA) algorithm with a maximum of `max_iter = 100` iterations.
+
+All of these settings can be modified by the user through the function arguments. For example, users may specify `q`, `q_max`, `lambda`, `mu`, `tuning_method`, `df`, `degree`, or increase `max_iter` for more challenging datasets.
+
+```{r fit, results='hide', message=TRUE, warning=TRUE}
+fit <- semiauto_fit(
+  prepared = prep,
+  max_iter = 1000
+)
+```
+
+The package automatically checks for several data conditions before fitting the model and may issue warnings when potential problems are detected. These warnings include strong multicollinearity between predictors, insufficient unique values for spline estimation, and limited sample size relative to model complexity.
+
+In this example, a multicollinearity warning is generated because `kurs` and `m3` have a very high correlation `(|cor| = 0.992)`. Therefore, the identified nonlinear effects for these variables should be interpreted with caution.
+
+## Step 3 — Inspecting the Result
+
+### Print method
+
+The `print()` method provides a concise overview of the fitted model. It reports the identified linear and nonlinear predictors, the selected AR order, the active autoregressive lags, and the estimated tuning parameters. This output is useful for quickly checking whether the structure identification procedure converged to a reasonable solution.
+
+```{r print}
+print(fit)
+```
+
+In this example, `industri` was identified as a linear predictor, while `kurs`, `m3`, `kredit`, and `brent` were classified as nonlinear. The selected AR order was `4`, although only the first three lags remained active after penalization.
+
+### Summary method
+
+The `summary()` method provides additional information about model fit and parameter estimates. Besides the identified structure, it reports goodness-of-fit measures such as R², RMSE, and residual sum of squares, together with estimates for the linear and nonlinear components.
+
+```{r summary}
+summary(fit)
+```
+
+`summary()` adds model-fit statistics ($R^2$, RMSE, residual SS), the
+full linear coefficient table, and a table of nonlinear norms
+$\|\hat{\boldsymbol{\theta}}_j\|$ for variables in $\hat{S}_2$.
+
+The summary indicates that the fitted model explains a large proportion of the variability in inflation (R² ≈ 0.98). It also reports the estimated coefficient for the linear predictor and the norms of the spline coefficients associated with the nonlinear predictors.
+
+### Extracting components
+
+Individual components of the fitted model can be accessed directly from the returned object. This allows users to extract the identified variable sets, AR coefficients, tuning parameters, fitted values, and residuals for further analysis.
+
+```{r extract}
+# Linear predictors identified
+fit$linear_vars
+
+# Nonlinear predictors identified
+fit$nonlinear_vars
+
+# Selected AR order
+fit$q_selected
+
+# Active AR lags and coefficients
+fit$active_lags
+fit$gamma[fit$active_lags]
+
+# Tuning parameters
+c(lambda = fit$lambda, mu = fit$mu)
+
+# Fitted values and residuals
+head(fitted(fit))
+head(residuals(fit))
+```
+
+The extracted values confirm that `industri` belongs to the linear set, whereas the remaining predictors are treated as nonlinear. The selected AR structure consists of lags 1–3, and the estimated tuning parameters are λ = 1.9496 and μ = 1.
+
+## Step 4 — Diagnostics with `semiauto_plot()`
+
+`semiauto_plot()` produces up to six ggplot2 diagnostic panels. By default, it returns a named list of ggplot objects, so each panel can be inspected separately. If `combine = TRUE`, the panels are assembled into a single patchwork figure.
+
+```{r plot-list, fig.height = 4}
+plots <- semiauto_plot(fit)
+names(plots)
+
+# Panel 1: estimated nonlinear component curves  g_j(x)
+plots$nonlinear
+
+# Panel 2: residuals vs fitted (with lowess smoother)
+plots$resid_fitted
+```
+
+```{r plot-acf, fig.height = 4}
+# Panel 3: ACF of residuals — check for remaining serial correlation
+plots$acf
+```
+
+```{r plot-obs, fig.height = 4}
+# Panel 4: observed vs fitted time series
+plots$obs_fitted
+```
+
+```{r plot-structure, fig.height = 3.5}
+# Panel 5: structure identification bar chart
+#  Blue bars  => ||theta_j|| = 0  => linear
+#  Orange bars => ||theta_j|| > 0 => nonlinear
+plots$structure
+```
+
+```{r plot-ar, fig.height = 3}
+# Panel 6: estimated AR coefficients
+#  Green bars => significant; grey bars => shrunk to zero
+plots$ar_coefs
+```
+
+In this example, the diagnostic plots show the identified nonlinear components, residual behavior, remaining autocorrelation, observed-versus-fitted values, structure identification, and selected AR coefficients.
+
+### Combined figure
+
+```{r plot-combined, fig.height = 10}
+semiauto_plot(fit, combine = TRUE)
+```
+
+------------------------------------------------------------------------
+
+# Tuning Options
+
+## Choosing the Tuning Method
+
+Three methods are available via the `tuning_method` argument:
+
+| Method | Speed | Description |
+|-------------------|-------------------|--------------------------------|
+| `"BIC"` | Fast | Bayesian Information Criterion (default). Recommended for most applications. |
+| `"AIC"` | Fast | Akaike Information Criterion. Slightly less sparse than BIC. |
+| `"CV"` | Slow | 5-fold cross-validation. More accurate for prediction; not recommended for large grids. |
+
+```{r tuning-aic, eval = FALSE}
+fit_aic <- semiauto_fit(prepared = prep, tuning_method = "AIC")
+fit_cv  <- semiauto_fit(prepared = prep, tuning_method = "CV")
+```
+
+## Supplying Fixed Hyperparameters
+
+If you have prior knowledge about $\lambda$ and $\mu$ (e.g., from a
+preliminary analysis), you can bypass the grid search:
+
+```{r fixed-params, eval = FALSE}
+fit_fixed_params <- semiauto_fit(
+  prepared = prep,
+  lambda   = 0.3,
+  mu       = 0.2,
+  q        = 1L
+)
+```
+
+## Custom Grids
+
+The default grids span `exp(seq(log(0.05), log(3), length.out = 20))`
+for $\lambda$ and `exp(seq(log(0.1), log(1), length.out = 15))` for
+$\mu$. You can supply your own:
+
+```{r custom-grid, eval = FALSE}
+fit_custom <- semiauto_fit(
+  prepared     = prep,
+  lambda_grid  = seq(0.1, 1.0, by = 0.1),
+  mu_grid      = seq(0.05, 0.5, by = 0.05)
+)
+```
+
+## Spline Settings
+
+The default uses cubic B-splines (`degree = 3`) with `df = 6` basis
+functions per predictor (i.e., 3 internal knots). Increasing `df` gives
+more flexibility at the cost of higher variance:
+
+```{r spline-settings, eval = FALSE}
+fit_flex <- semiauto_fit(
+  prepared = prep,
+  df       = 8L,
+  degree   = 3L
+)
+```
+
+------------------------------------------------------------------------
+
+# Prediction on New Data
+
+`predict()` applies the fitted model to a new data frame. The function
+rescales new covariate values using the training-data range and
+re-applies the same B-spline centring:
+
+```{r predict, eval = FALSE}
+# Suppose new_obs is a data frame with the same column names as the predictors
+new_obs <- macro_turkey[120:133, ]
+yhat    <- predict(fit, newdata = new_obs)
+head(yhat)
+```
+
+When `newdata = NULL`, `predict()` returns the in-sample fitted values,
+equivalent to `fitted(fit)`.
+
+------------------------------------------------------------------------
+
+# Workflow Summary
+
+The typical `semiautoReg` workflow consists of four steps:
+
+         
+```{r workflow-table, echo=FALSE, warning=FALSE, message=FALSE}
+library(knitr)
+library(kableExtra)
+
+workflow_tbl <- data.frame(
+  Step = c("1", "2", "3", "4"),
+  Function = c(
+    "semiauto_check()",
+    "semiauto_prepare()",
+    "semiauto_fit()",
+    "semiauto_plot()"
+  ),
+  Purpose = c(
+    "Optional standalone data quality check",
+    "Clean, sort, and build model matrices",
+    "SCAD-BCD identification and parameter estimation",
+    "Six-panel ggplot2 diagnostics"
+  )
+)
+
+kable(
+  workflow_tbl,
+  caption = "Typical semiautoReg Workflow",
+  align = c("c","l","l")
+) |>
+  kable_styling(
+    bootstrap_options = c("striped","hover","condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) |>
+  row_spec(0,
+           bold = TRUE,
+           color = "white",
+           background = "#2C3E50")
+```
+
+
+S3 generics `print()`, `summary()`, `fitted()`, `residuals()`, and
+`predict()` are all available on the `semiauto_fit` object.
+
+------------------------------------------------------------------------
+
+# Notes and Limitations
+
+-   **AR order**: The current implementation supports AR($q$) errors
+    with $q$ selected automatically up to `q_max = 5`. The AR
+    auto-selection is based on BIC applied to initial OLS residuals and
+    is independent of the SCAD penalty.
+
+-   **Sample size**: The method requires a sufficient number of
+    observations relative to the total number of B-spline basis
+    functions ($n \geq 2 p \bar{K}$). A warning is issued if this
+    condition is not met.
+
+-   **High multicollinearity**: When two predictors have pairwise
+    correlation $|\rho| \geq 0.8$, a warning is issued because structure
+    identification can become unstable. Consider dimension reduction or
+    variable removal before fitting.
+
+-   **Categorical predictors**: `semiauto_fit()` expects all predictors
+    to be continuous. Binary or ordinal variables with few unique values
+    trigger a warning and should be treated as fixed linear terms.
+
+-   **Convergence**: If the algorithm does not converge within
+    `max_iter` iterations, a warning is printed. Increase `max_iter`
+    (e.g., `max_iter = 1000`) or adjust the penalty grid.
+
+------------------------------------------------------------------------
+
+# References
+
+Fan, J., & Li, R. (2001). Variable selection via nonconcave penalized likelihood and its oracle properties. *Journal of the American Statistical Association*, *96*(456), 1348–1360.
+
+Kazemi, M., Shahsvani, D., Arashi, M., & Rodrigues, P. C. (2021). Identification for partially linear regression model with autoregressive errors. *Journal of Statistical Computation and Simulation*, *91*(7), 1441–1454.
